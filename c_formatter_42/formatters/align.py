@@ -1,14 +1,14 @@
-# ############################################################################ #
+# **************************************************************************** #
 #                                                                              #
 #                                                         :::      ::::::::    #
 #    align.py                                           :+:      :+:    :+:    #
 #                                                     +:+ +:+         +:+      #
-#    By: cacharle <me@cacharle.xyz>                 +#+  +:+       +#+         #
+#    By: tschumac <tschumac@student.42luxembourg    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2020/10/04 09:56:31 by cacharle          #+#    #+#              #
-#    Updated: 2021/02/11 20:13:11 by charles          ###   ########.fr        #
+#    Updated: 2026/01/21 22:46:51 by tschumac         ###   ########.fr        #
 #                                                                              #
-# ############################################################################ #
+# **************************************************************************** #
 
 from __future__ import annotations
 
@@ -61,6 +61,29 @@ def align_scope(content: str, scope: Literal["local", "global"]) -> str:
         if match is not None
         and match.group("prefix") not in ["struct", "union", "enum"]
     ]
+
+    # For local scope, also check for static/const array declarations
+    # Including function pointer arrays for alignment
+    if scope == "local":
+        # Simple arrays
+        static_const_array_regex = re.compile(
+            r"^\t(?P<prefix>(?:(?:static|const)\s+)+\S+)\s+(?P<suffix>\w+\[\]\s*=\s*\{.*)"
+        )
+        # Function pointer arrays: static type (*const name[])(params) = {
+        # Match up to (*const, then suffix starts with name
+        func_ptr_array_regex = re.compile(
+            r"^\t(?P<prefix>(?:(?:static|const)\s+)+\S+\s+\(\*(?:const)?)\s+(?P<suffix>\w+\[\]\)\s*\([^)]+\)\s*=\s*\{.*)"
+        )
+        for i, line in enumerate(lines):
+            # Try function pointer array first
+            m = func_ptr_array_regex.match(line)
+            if m is not None:
+                aligned.append((i, m.group("prefix"), m.group("suffix")))
+                continue
+            # Then try simple array
+            m = static_const_array_regex.match(line)
+            if m is not None:
+                aligned.append((i, m.group("prefix"), m.group("suffix")))
 
     # Global type declaration (struct/union/enum)
     if scope == "global":
